@@ -184,9 +184,7 @@ class StockStreamProcessor:
         if err is not None:
             print(f"Message delivery failed: {err}")
         else:
-            pass
-            # Uncomment for verbose logging
-            # print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+            print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
     def send_to_kafka(self, topic: str, key: str, value: Dict[str, Any]):
         """Send a message to a Kafka topic"""
