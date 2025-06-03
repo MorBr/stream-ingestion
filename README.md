@@ -75,7 +75,7 @@ Tracks the number of quotes per ticker per hour:
 To run the processor:
 
 ```bash
-python python-stream-processor.py --mode process --kafka localhost:9092 --config ./snowflake.properties
+python python_stream_processor.py --mode process --kafka localhost:9092 --config ./snowflake.properties
 ```
 
 ### Simulation Mode
@@ -83,7 +83,7 @@ python python-stream-processor.py --mode process --kafka localhost:9092 --config
 To generate test data:
 
 ```bash
-python python-stream-processor.py --mode simulate --kafka localhost:9092 --count 1000 --speed SLOW
+python python_stream_processor.py --mode simulate --kafka localhost:9092 --count 1000 --speed SLOW
 ```
 
 Speed options:

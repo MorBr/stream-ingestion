@@ -14,7 +14,7 @@ from python_stream_processor import (
     StockDataSimulator,
     load_config,
     ILS_EXCHANGE_RATE,
-    MOVING_AVG_WINDOW_SIZE
+    MOVING_AVG_WINDOW_SIZE,
 )
 
 
@@ -41,7 +41,7 @@ class TestStockQuote:
             "price": 300.25,
             "timestamp": 1640995200000,
             "price_ils": 1111.93,
-            "moving_avg": 295.5
+            "moving_avg": 295.5,
         }
         assert quote.to_dict() == expected
 
@@ -52,7 +52,7 @@ class TestStockQuote:
             "price": 2800.0,
             "timestamp": 1640995200000,
             "price_ils": 10360.0,
-            "moving_avg": 2750.5
+            "moving_avg": 2750.5,
         }
 
         quote = StockQuote.from_dict(data)
@@ -64,11 +64,7 @@ class TestStockQuote:
 
     def test_stock_quote_from_dict_minimal(self):
         """Test StockQuote from_dict with minimal data"""
-        data = {
-            "ticker": "TSLA",
-            "price": 1000.0,
-            "timestamp": 1640995200000
-        }
+        data = {"ticker": "TSLA", "price": 1000.0, "timestamp": 1640995200000}
 
         quote = StockQuote.from_dict(data)
         assert quote.ticker == "TSLA"
@@ -83,9 +79,11 @@ class TestStockQuote:
         quote.price_ils = 11840.0
         quote.moving_avg = 3150.0
 
-        expected = ("StockQuote(ticker=AMZN, price=3200.0, "
-                    "timestamp=1640995200000, price_ils=11840.0, "
-                    "moving_avg=3150.0)")
+        expected = (
+            "StockQuote(ticker=AMZN, price=3200.0, "
+            "timestamp=1640995200000, price_ils=11840.0, "
+            "moving_avg=3150.0)"
+        )
         assert str(quote) == expected
 
 
@@ -123,15 +121,17 @@ class TestHourlyAggregation:
         expected = {
             "ticker": "TSLA",
             "hour_timestamp": 1640995200000,
-            "quote_count": 10
+            "quote_count": 10,
         }
         assert agg.to_dict() == expected
 
     def test_str(self):
         """Test string representation"""
         agg = HourlyAggregation("NFLX", 1640995200000, 3)
-        expected = ("HourlyAggregation(ticker=NFLX, "
-                    "hour_timestamp=1640995200000, quote_count=3)")
+        expected = (
+            "HourlyAggregation(ticker=NFLX, "
+            "hour_timestamp=1640995200000, quote_count=3)"
+        )
         assert str(agg) == expected
 
 
@@ -141,8 +141,9 @@ class TestStockStreamProcessor:
     @pytest.fixture
     def processor(self):
         """Create a StockStreamProcessor instance for testing"""
-        with patch('python_stream_processor.Producer'), \
-                patch('python_stream_processor.Session'):
+        with patch("python_stream_processor.Producer"), patch(
+            "python_stream_processor.Session"
+        ):
             return StockStreamProcessor("localhost:9092")
 
     @pytest.fixture
@@ -151,10 +152,11 @@ class TestStockStreamProcessor:
         snowflake_config = {
             "account": "test_account",
             "user": "test_user",
-            "password": "test_password"
+            "password": "test_password",
         }
-        with patch('python_stream_processor.Producer'), \
-                patch('python_stream_processor.Session') as mock_session:
+        with patch("python_stream_processor.Producer"), patch(
+            "python_stream_processor.Session"
+        ) as mock_session:
             mock_session.builder.configs.return_value.create.return_value = Mock()
             return StockStreamProcessor("localhost:9092", snowflake_config)
 
@@ -172,7 +174,7 @@ class TestStockStreamProcessor:
         assert processor_with_snowflake.snowflake_config is not None
         assert processor_with_snowflake.snowflake_session is not None
 
-    @patch('python_stream_processor.requests.get')
+    @patch("python_stream_processor.requests.get")
     def test_get_exchange_rate_success(self, mock_get, processor):
         """Test successful exchange rate retrieval"""
         mock_response = Mock()
@@ -181,9 +183,11 @@ class TestStockStreamProcessor:
 
         rate = processor.get_exchange_rate()
         assert rate == 3.5
-        mock_get.assert_called_once_with("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+        mock_get.assert_called_once_with(
+            "https://api.exchangerate-api.com/v4/latest/USD", timeout=5
+        )
 
-    @patch('python_stream_processor.requests.get')
+    @patch("python_stream_processor.requests.get")
     def test_get_exchange_rate_failure(self, mock_get, processor):
         """Test exchange rate retrieval failure fallback"""
         mock_get.side_effect = Exception("API Error")
@@ -248,7 +252,7 @@ class TestStockStreamProcessor:
         key = f"AAPL_{hour_timestamp}"
         assert processor.hourly_aggregations[key].quote_count == 2
 
-    @patch('python_stream_processor.StockStreamProcessor.get_exchange_rate')
+    @patch("python_stream_processor.StockStreamProcessor.get_exchange_rate")
     def test_enrich_quote(self, mock_exchange_rate, processor):
         """Test quote enrichment"""
         mock_exchange_rate.return_value = 3.5
@@ -266,15 +270,11 @@ class TestStockStreamProcessor:
 
     def test_process_message_valid(self, processor):
         """Test processing valid message"""
-        with patch.object(processor, 'enrich_quote') as mock_enrich:
+        with patch.object(processor, "enrich_quote") as mock_enrich:
             mock_quote = StockQuote("AAPL", 100.0, 1640995200000)
             mock_enrich.return_value = mock_quote
 
-            message = {
-                "ticker": "AAPL",
-                "price": "100.0",
-                "timestamp": "1640995200000"
-            }
+            message = {"ticker": "AAPL", "price": "100.0", "timestamp": "1640995200000"}
 
             result = processor.process_message(message)
             assert result == mock_quote
@@ -296,20 +296,20 @@ class TestStockStreamProcessor:
 
     def test_process_message_deduplication(self, processor):
         """Test message deduplication"""
-        with patch.object(processor, 'enrich_quote') as mock_enrich:
+        with patch.object(processor, "enrich_quote") as mock_enrich:
             mock_quote = StockQuote("AAPL", 100.0, 1640995200000)
             mock_enrich.return_value = mock_quote
 
             message1 = {
                 "ticker": "AAPL",
                 "price": "100.0",
-                "timestamp": "1640995200000"
+                "timestamp": "1640995200000",
             }
 
             message2 = {
                 "ticker": "AAPL",
                 "price": "110.0",
-                "timestamp": "1640995100000"  # Earlier timestamp
+                "timestamp": "1640995100000",  # Earlier timestamp
             }
 
             # Process first message
@@ -333,9 +333,9 @@ class TestStockStreamProcessor:
         processor.producer.produce.assert_called_once()
         args, kwargs = processor.producer.produce.call_args
 
-        assert kwargs['topic'] == "test-topic"
-        assert kwargs['key'] == b"AAPL"
-        assert json.loads(kwargs['value'].decode('utf-8')) == test_data
+        assert kwargs["topic"] == "test-topic"
+        assert kwargs["key"] == b"AAPL"
+        assert json.loads(kwargs["value"].decode("utf-8")) == test_data
 
     def test_save_to_snowflake_no_connection(self, processor):
         """Test saving to Snowflake without connection"""
@@ -345,13 +345,17 @@ class TestStockStreamProcessor:
     def test_save_to_snowflake_with_connection(self, processor_with_snowflake):
         """Test saving to Snowflake with connection"""
         mock_df = Mock()
-        processor_with_snowflake.snowflake_session.create_dataframe.return_value = mock_df
+        processor_with_snowflake.snowflake_session.create_dataframe.return_value = (
+            mock_df
+        )
 
         test_data = [{"ticker": "AAPL", "price": 100.0}]
         result = processor_with_snowflake.save_to_snowflake("test_table", test_data)
 
         assert result is True
-        processor_with_snowflake.snowflake_session.create_dataframe.assert_called_once_with(test_data)
+        processor_with_snowflake.snowflake_session.create_dataframe.assert_called_once_with(
+            test_data
+        )
         mock_df.write.mode.assert_called_once_with("append")
 
     def test_flush_hourly_aggregations_empty(self, processor):
@@ -383,7 +387,7 @@ class TestStockDataSimulator:
     @pytest.fixture
     def simulator(self):
         """Create a StockDataSimulator instance for testing"""
-        with patch('python_stream_processor.Producer') as mock_producer:
+        with patch("python_stream_processor.Producer") as mock_producer:
             return StockDataSimulator("localhost:9092", "MAX")
 
     def test_simulator_initialization(self, simulator):
@@ -394,12 +398,12 @@ class TestStockDataSimulator:
 
     def test_simulator_speed_conversion(self):
         """Test that speed is converted to uppercase"""
-        with patch('python_stream_processor.Producer'):
+        with patch("python_stream_processor.Producer"):
             simulator = StockDataSimulator("localhost:9092", "slow")
             assert simulator.speed == "SLOW"
 
-    @patch('python_stream_processor.datetime')
-    @patch('python_stream_processor.random')
+    @patch("python_stream_processor.datetime")
+    @patch("python_stream_processor.random")
     def test_generate_stock_data(self, mock_random, mock_datetime, simulator):
         """Test stock data generation"""
         # Mock random choices and values
@@ -418,10 +422,12 @@ class TestStockDataSimulator:
         # Verify flush was called
         simulator.producer.flush.assert_called_once()
 
-    @patch('python_stream_processor.time.sleep')
-    @patch('python_stream_processor.datetime')
-    @patch('python_stream_processor.random')
-    def test_generate_stock_data_with_delay(self, mock_random, mock_datetime, mock_sleep, simulator):
+    @patch("python_stream_processor.time.sleep")
+    @patch("python_stream_processor.datetime")
+    @patch("python_stream_processor.random")
+    def test_generate_stock_data_with_delay(
+        self, mock_random, mock_datetime, mock_sleep, simulator
+    ):
         """Test stock data generation with delay"""
         simulator.speed = "SLOW"
 
@@ -451,7 +457,7 @@ class TestLoadConfig:
         expected = {
             "user": "test_user",
             "password": "test_password",
-            "account": "test_account"
+            "account": "test_account",
         }
         assert config == expected
 
@@ -475,8 +481,8 @@ class TestLoadConfig:
 class TestIntegration:
     """Integration tests for the complete workflow"""
 
-    @patch('python_stream_processor.Producer')
-    @patch('python_stream_processor.requests.get')
+    @patch("python_stream_processor.Producer")
+    @patch("python_stream_processor.requests.get")
     def test_end_to_end_quote_processing(self, mock_get, mock_producer):
         """Test complete quote processing workflow"""
         # Mock exchange rate API
@@ -539,7 +545,7 @@ def sample_config():
         "password": "test_password",
         "warehouse": "test_warehouse",
         "database": "test_database",
-        "schema": "test_schema"
+        "schema": "test_schema",
     }
 
 
@@ -549,8 +555,9 @@ class TestPerformance:
 
     def test_large_batch_processing(self):
         """Test processing large batch of messages"""
-        with patch('python_stream_processor.Producer'), \
-                patch('python_stream_processor.requests.get') as mock_get:
+        with patch("python_stream_processor.Producer"), patch(
+            "python_stream_processor.requests.get"
+        ) as mock_get:
             mock_response = Mock()
             mock_response.json.return_value = {"rates": {"ILS": 3.5}}
             mock_get.return_value = mock_response
@@ -563,7 +570,7 @@ class TestPerformance:
                 message = {
                     "ticker": f"STOCK{i % 10}",
                     "price": str(100.0 + i),
-                    "timestamp": str(1640995200000 + i * 1000)
+                    "timestamp": str(1640995200000 + i * 1000),
                 }
                 processor.process_message(message)
 

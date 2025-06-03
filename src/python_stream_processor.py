@@ -33,20 +33,22 @@ class StockQuote:
             "price": self.price,
             "timestamp": self.timestamp,
             "price_ils": self.price_ils,
-            "moving_avg": self.moving_avg
+            "moving_avg": self.moving_avg,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'StockQuote':
+    def from_dict(cls, data: Dict[str, Any]) -> "StockQuote":
         quote = cls(data["ticker"], data["price"], data["timestamp"])
         quote.price_ils = data.get("price_ils")
         quote.moving_avg = data.get("moving_avg")
         return quote
 
     def __str__(self) -> str:
-        return (f"StockQuote(ticker={self.ticker}, price={self.price}, "
-                f"timestamp={self.timestamp}, price_ils={self.price_ils}, "
-                f"moving_avg={self.moving_avg})")
+        return (
+            f"StockQuote(ticker={self.ticker}, price={self.price}, "
+            f"timestamp={self.timestamp}, price_ils={self.price_ils}, "
+            f"moving_avg={self.moving_avg})"
+        )
 
 
 class HourlyAggregation:
@@ -64,18 +66,24 @@ class HourlyAggregation:
         return {
             "ticker": self.ticker,
             "hour_timestamp": self.hour_timestamp,
-            "quote_count": self.quote_count
+            "quote_count": self.quote_count,
         }
 
     def __str__(self) -> str:
-        return (f"HourlyAggregation(ticker={self.ticker}, "
-                f"hour_timestamp={self.hour_timestamp}, quote_count={self.quote_count})")
+        return (
+            f"HourlyAggregation(ticker={self.ticker}, "
+            f"hour_timestamp={self.hour_timestamp}, quote_count={self.quote_count})"
+        )
 
 
 class StockStreamProcessor:
     """Main stream processor class that handles all enrichments"""
 
-    def __init__(self, kafka_bootstrap_servers: str, snowflake_config: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        kafka_bootstrap_servers: str,
+        snowflake_config: Optional[Dict[str, str]] = None,
+    ):
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.snowflake_config = snowflake_config
 
@@ -85,9 +93,7 @@ class StockStreamProcessor:
         self.hourly_aggregations = defaultdict(lambda: HourlyAggregation(""))
 
         # Initialize Kafka producer
-        self.producer = Producer({
-            'bootstrap.servers': kafka_bootstrap_servers
-        })
+        self.producer = Producer({"bootstrap.servers": kafka_bootstrap_servers})
 
         # Initialize Snowflake connection if config provided
         self.snowflake_session = None
@@ -97,7 +103,9 @@ class StockStreamProcessor:
     def init_snowflake_connection(self):
         """Initialize Snowflake connection if config is provided"""
         try:
-            self.snowflake_session = Session.builder.configs(self.snowflake_config).create()
+            self.snowflake_session = Session.builder.configs(
+                self.snowflake_config
+            ).create()
             print("Connected to Snowflake")
         except Exception as e:
             print(f"Error connecting to Snowflake: {e}")
@@ -106,7 +114,9 @@ class StockStreamProcessor:
     def get_exchange_rate(self) -> float:
         """Get USD to ILS exchange rate from external API"""
         try:
-            response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+            response = requests.get(
+                "https://api.exchangerate-api.com/v4/latest/USD", timeout=5
+            )
             data = response.json()
             return data["rates"]["ILS"]
         except Exception as e:
@@ -164,7 +174,10 @@ class StockStreamProcessor:
                 return None
 
             # Deduplication - check if we've seen this ticker with a newer timestamp
-            if ticker in self.processed_timestamps and self.processed_timestamps[ticker] >= timestamp:
+            if (
+                ticker in self.processed_timestamps
+                and self.processed_timestamps[ticker] >= timestamp
+            ):
                 print(f"Skipping duplicate for {ticker} (ts: {timestamp})")
                 return None
 
@@ -191,9 +204,9 @@ class StockStreamProcessor:
         try:
             self.producer.produce(
                 topic,
-                key=key.encode('utf-8'),
-                value=json.dumps(value).encode('utf-8'),
-                callback=self.delivery_report
+                key=key.encode("utf-8"),
+                value=json.dumps(value).encode("utf-8"),
+                callback=self.delivery_report,
             )
             self.producer.poll(0)  # Trigger delivery reports
         except Exception as e:
@@ -215,7 +228,6 @@ class StockStreamProcessor:
             print(f"Error saving to Snowflake: {e}")
             return False
 
-
     def flush_hourly_aggregations(self):
         """Flush hourly aggregations to Kafka and/or Snowflake"""
         if not self.hourly_aggregations:
@@ -227,7 +239,7 @@ class StockStreamProcessor:
             self.send_to_kafka(
                 HOURLY_AGGREGATED_TOPIC,
                 f"{agg.ticker}_{agg.hour_timestamp}",
-                agg.to_dict()
+                agg.to_dict(),
             )
 
             # Add to batch for Snowflake
@@ -242,11 +254,13 @@ class StockStreamProcessor:
 
     def start_processing(self):
         """Start consuming messages from Kafka"""
-        consumer = Consumer({
-            'bootstrap.servers': self.kafka_bootstrap_servers,
-            'group.id': 'stock-stream-processor',
-            'auto.offset.reset': 'earliest'
-        })
+        consumer = Consumer(
+            {
+                "bootstrap.servers": self.kafka_bootstrap_servers,
+                "group.id": "stock-stream-processor",
+                "auto.offset.reset": "earliest",
+            }
+        )
 
         consumer.subscribe([STOCK_QUOTES_TOPIC])
 
@@ -269,20 +283,20 @@ class StockStreamProcessor:
 
                 # Process the message
                 try:
-                    data = json.loads(msg.value().decode('utf-8'))
+                    data = json.loads(msg.value().decode("utf-8"))
                     quote = self.process_message(data)
 
                     if quote:
                         # Send enriched quote to output topic
                         self.send_to_kafka(
-                            ENRICHED_QUOTES_TOPIC,
-                            quote.ticker,
-                            quote.to_dict()
+                            ENRICHED_QUOTES_TOPIC, quote.ticker, quote.to_dict()
                         )
 
                         # Save to Snowflake if connection available
                         if self.snowflake_session:
-                            self.save_to_snowflake("ENRICHED_STOCK_QUOTES", [quote.to_dict()])
+                            self.save_to_snowflake(
+                                "ENRICHED_STOCK_QUOTES", [quote.to_dict()]
+                            )
 
                 except Exception as e:
                     print(f"Error in message processing loop: {e}")
@@ -308,7 +322,7 @@ class StockDataSimulator:
     """Simulates stock data for testing the stream processor"""
 
     def __init__(self, kafka_bootstrap_servers: str, speed: str = "MAX"):
-        self.producer = Producer({'bootstrap.servers': kafka_bootstrap_servers})
+        self.producer = Producer({"bootstrap.servers": kafka_bootstrap_servers})
         self.speed = speed.upper()
         self.tickers = ["AAPL", "MSFT", "GOOG", "AMZN", "META", "TSLA", "NFLX", "WIX"]
 
@@ -336,11 +350,7 @@ class StockDataSimulator:
             timestamp = datetime.timestamp(datetime.now())
 
             # Create message
-            message = {
-                "ticker": ticker,
-                "price": price,
-                "timestamp": timestamp
-            }
+            message = {"ticker": ticker, "price": price, "timestamp": timestamp}
 
             # Add delay based on speed
             if self.speed != "MAX":
@@ -357,9 +367,9 @@ class StockDataSimulator:
             # Send to Kafka
             self.producer.produce(
                 STOCK_QUOTES_TOPIC,
-                key=ticker.encode('utf-8'),
-                value=json.dumps(message).encode('utf-8'),
-                callback=self.delivery_report
+                key=ticker.encode("utf-8"),
+                value=json.dumps(message).encode("utf-8"),
+                callback=self.delivery_report,
             )
 
             # Trigger callbacks to catch any errors
@@ -379,11 +389,11 @@ def load_config(profile_path: str = "./snowflake.properties") -> Dict[str, str]:
     config = {}
     try:
         if os.path.exists(profile_path):
-            with open(profile_path, 'r') as f:
+            with open(profile_path, "r") as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith('#'):
-                        key, value = line.split('=', 1)
+                    if line and not line.startswith("#"):
+                        key, value = line.split("=", 1)
                         config[key.strip()] = value.strip()
         else:
             print(f"Config file not found: {profile_path}")
@@ -394,24 +404,39 @@ def load_config(profile_path: str = "./snowflake.properties") -> Dict[str, str]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Stock Stream Processor')
-    parser.add_argument('--mode', choices=['process', 'simulate'], default='process',
-                        help='Mode: process (process data) or simulate (generate data)')
-    parser.add_argument('--speed', default='MAX',
-                        help='Simulation speed: MAX, SLOW, SLOOW, SLOOOW, SLOOOOW')
-    parser.add_argument('--count', type=int, default=1000,
-                        help='Number of messages to generate in simulation mode')
-    parser.add_argument('--kafka', default='localhost:9092',
-                        help='Kafka bootstrap servers')
-    parser.add_argument('--config', default='./snowflake.properties',
-                        help='Path to Snowflake configuration file')
+    parser = argparse.ArgumentParser(description="Stock Stream Processor")
+    parser.add_argument(
+        "--mode",
+        choices=["process", "simulate"],
+        default="process",
+        help="Mode: process (process data) or simulate (generate data)",
+    )
+    parser.add_argument(
+        "--speed",
+        default="MAX",
+        help="Simulation speed: MAX, SLOW, SLOOW, SLOOOW, SLOOOOW",
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=1000,
+        help="Number of messages to generate in simulation mode",
+    )
+    parser.add_argument(
+        "--kafka", default="localhost:9092", help="Kafka bootstrap servers"
+    )
+    parser.add_argument(
+        "--config",
+        default="./snowflake.properties",
+        help="Path to Snowflake configuration file",
+    )
 
     args = parser.parse_args()
 
     # Load Snowflake configuration
     snowflake_config = load_config(args.config)
 
-    if args.mode == 'simulate':
+    if args.mode == "simulate":
         # Run simulator to generate data
         simulator = StockDataSimulator(args.kafka, args.speed)
         simulator.generate_stock_data(args.count)
